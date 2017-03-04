@@ -25,6 +25,8 @@
 #include <dynamic_reconfigure/server.h>
 #include <velodyne_pointcloud/CloudNodeConfig.h>
 
+#include <hw_timer/HwTimer.hpp>
+
 namespace velodyne_pointcloud
 {
   class Convert
@@ -47,6 +49,9 @@ namespace velodyne_pointcloud
     boost::shared_ptr<velodyne_rawdata::RawData> data_;
     ros::Subscriber velodyne_scan_;
     ros::Publisher output_;
+
+    hw_timer::HwTimer hw_timer_;
+
 
     /// configuration parameters
     typedef struct {

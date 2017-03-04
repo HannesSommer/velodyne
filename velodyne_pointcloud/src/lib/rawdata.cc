@@ -137,6 +137,16 @@ namespace velodyne_rawdata
       return 0;
   }
 
+  uint32_t getGPSTimestamp(const raw_packet_t* raw_packet) {
+    uint32_t gpsTimestamp;
+    memcpy(reinterpret_cast<uint8_t*>(&gpsTimestamp),
+      reinterpret_cast<const uint8_t*>(&raw_packet->revolution), 2);
+    memcpy(reinterpret_cast<uint8_t*>(
+      &(reinterpret_cast<uint8_t*>(&gpsTimestamp)[2])),
+      reinterpret_cast<const uint8_t*>(&raw_packet->status), 2);
+    return gpsTimestamp;
+  }
+
 
   /** @brief convert raw packet to point cloud
    *
@@ -144,7 +154,7 @@ namespace velodyne_rawdata
    *  @param pc shared pointer to point cloud (points are appended)
    */
   void RawData::unpack(const velodyne_msgs::VelodynePacket &pkt,
-                       VPointCloud &pc)
+                       VPointCloud &pc, uint32_t * hwTime)
   {
     ROS_DEBUG_STREAM("Received packet, time: " << pkt.stamp);
     
@@ -157,6 +167,9 @@ namespace velodyne_rawdata
     
     const raw_packet_t *raw = (const raw_packet_t *) &pkt.data[0];
 
+    if(hwTime){
+      *hwTime =  getGPSTimestamp(raw);
+    }
     for (int i = 0; i < BLOCKS_PER_PACKET; i++) {
 
       // upper bank lasers are numbered [0..31]

@@ -21,7 +21,8 @@ namespace velodyne_pointcloud
 {
   /** @brief Constructor. */
   Convert::Convert(ros::NodeHandle node, ros::NodeHandle private_nh):
-    data_(new velodyne_rawdata::RawData())
+    data_(new velodyne_rawdata::RawData()),
+    hw_timer_("/scan", private_nh, 1000)
   {
     data_->setup(private_nh);
 
@@ -55,6 +56,10 @@ namespace velodyne_pointcloud
   /** @brief Callback for raw scan messages. */
   void Convert::processScan(const velodyne_msgs::VelodyneScan::ConstPtr &scanMsg)
   {
+
+    static hw_timer::WrapFixer hw_start(1L << 32, 1e6);
+
+
     if (output_.getNumSubscribers() == 0)         // no one listening?
       return;                                     // avoid much work
 
@@ -66,16 +71,36 @@ namespace velodyne_pointcloud
     outMsg->header.frame_id = scanMsg->header.frame_id;
     outMsg->height = 1;
 
+    size_t lastSize = 0;
     // process each packet provided by the driver
+
+    int pCount = 0;
     for (size_t i = 0; i < scanMsg->packets.size(); ++i)
       {
-        data_->unpack(scanMsg->packets[i], *outMsg);
-      }
+        uint32_t hwTime;
+        data_->unpack(scanMsg->packets[i], *outMsg, &hwTime);
 
-    // publish the accumulated cloud message
-    ROS_DEBUG_STREAM("Publishing " << outMsg->height * outMsg->width
-                     << " Velodyne points, time: " << outMsg->header.stamp);
-    output_.publish(outMsg);
+        if(outMsg->size() > 0 && lastSize == 0) {
+          hw_start.update(hwTime);
+          std::cout << "hw_start.toSec()=" << hw_start.toSec() << std::endl; // XXX: debug output of hw_start.toSec()
+          ros::Time t;
+          t.fromSec(hw_timer_.update(hw_start, hw_start, scanMsg->packets[i].stamp.toSec()));
+          std::cout << "t.sec=" << t.sec << std::endl; // XXX: debug output of t.sec
+          outMsg->header.stamp = pcl_conversions::toPCL(t);
+        }
+
+        if(outMsg->size() > 0 && outMsg->size() == lastSize){
+          // publish the accumulated cloud message
+          ROS_DEBUG_STREAM("Publishing " << outMsg->height * outMsg->width
+                           << " Velodyne points, time: " << outMsg->header.stamp);
+          output_.publish(outMsg);
+          pCount ++;
+          outMsg->clear();
+        }
+
+        lastSize = outMsg->size();
+      }
+    std::cout << "pCount=" << pCount << std::endl; // XXX: debug output of pCount
   }
 
 } // namespace velodyne_pointcloud

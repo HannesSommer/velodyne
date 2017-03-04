@@ -15,7 +15,7 @@ set(${PROJECT_NAME}_CATKIN_DEPS
 )
 
 find_package(catkin REQUIRED COMPONENTS
-             ${${PROJECT_NAME}_CATKIN_DEPS} pcl_conversions)
+             ${${PROJECT_NAME}_CATKIN_DEPS} pcl_conversions hw_timer)
 find_package(Boost COMPONENTS signals)
 
 # Resolve system dependency on yaml-cpp, which apparently does not
@@ -47,7 +47,7 @@ catkin_package(
     CATKIN_DEPENDS ${${PROJECT_NAME}_CATKIN_DEPS}
     DEPENDS yaml-cpp python-yaml
     INCLUDE_DIRS include
-    LIBRARIES velodyne_rawdata)
+    LIBRARIES velodyne_rawdata hw_timer)
     
 #add_executable(dynamic_reconfigure_node src/dynamic_reconfigure_node.cpp)
 #target_link_libraries(dynamic_reconfigure_node
