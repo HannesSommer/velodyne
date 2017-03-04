@@ -146,7 +146,7 @@ namespace velodyne_rawdata
      */
     int setupOffline(std::string calibration_file, double max_range_, double min_range_);
 
-    void unpack(const velodyne_msgs::VelodynePacket &pkt, VPointCloud &pc, uint32_t *hwTime = NULL);
+    void unpack(const velodyne_msgs::VelodynePacket &pkt, VPointCloud &pc, uint32_t *hwTime = NULL, double * timeGapTillEndSecs = NULL);
     
     void setParameters(double min_range, double max_range, double view_direction,
                        double view_width);

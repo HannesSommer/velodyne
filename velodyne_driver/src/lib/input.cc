@@ -167,6 +167,7 @@ namespace velodyne_driver
               }
           } while ((fds[0].revents & POLLIN) == 0);
 
+        time1 = ros::Time::now().toSec();
         // Receive packets that should now be available from the
         // socket using a blocking read.
         ssize_t nbytes = recvfrom(sockfd_, &pkt->data[0],
@@ -199,11 +200,7 @@ namespace velodyne_driver
                          << nbytes << " bytes");
       }
 
-    // Average the times at which we begin and end reading.  Use that to
-    // estimate when the scan occurred. Add the time offset.
-    double time2 = ros::Time::now().toSec();
-    pkt->stamp = ros::Time((time2 + time1) / 2.0 + time_offset);
-
+    pkt->stamp.fromSec(time1 + time_offset);
     return 0;
   }
 

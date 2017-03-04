@@ -154,7 +154,7 @@ namespace velodyne_rawdata
    *  @param pc shared pointer to point cloud (points are appended)
    */
   void RawData::unpack(const velodyne_msgs::VelodynePacket &pkt,
-                       VPointCloud &pc, uint32_t * hwTime)
+                       VPointCloud &pc, uint32_t * hwTime, double * timeGapTillEndSecs)
   {
     ROS_DEBUG_STREAM("Received packet, time: " << pkt.stamp);
     
@@ -167,9 +167,9 @@ namespace velodyne_rawdata
     
     const raw_packet_t *raw = (const raw_packet_t *) &pkt.data[0];
 
-    if(hwTime){
-      *hwTime =  getGPSTimestamp(raw);
-    }
+    int lastBlockIndex = -1;
+//    int lastScanIndex = -1;
+
     for (int i = 0; i < BLOCKS_PER_PACKET; i++) {
 
       // upper bank lasers are numbered [0..31]
@@ -314,9 +314,17 @@ namespace velodyne_rawdata
             // append this point to the cloud
             pc.points.push_back(point);
             ++pc.width;
+
+            lastBlockIndex = i;
           }
         }
       }
+    }
+    if(hwTime){
+      *hwTime = getGPSTimestamp(raw);
+    }
+    if(timeGapTillEndSecs && lastBlockIndex >= 0){
+      *timeGapTillEndSecs = (BLOCKS_PER_PACKET - lastBlockIndex + 1) * 46.08 * 1e-6;
     }
   }
   

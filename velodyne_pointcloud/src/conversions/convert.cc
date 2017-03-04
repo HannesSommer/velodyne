@@ -57,7 +57,7 @@ namespace velodyne_pointcloud
   void Convert::processScan(const velodyne_msgs::VelodyneScan::ConstPtr &scanMsg)
   {
 
-    static hw_timer::WrapFixer hw_start(1L << 32, 1e6);
+    static hw_timer::WrapFixer hw_start(3600 * 1e6, 1e6); // wraps every hour according to documentation!
 
 
     if (output_.getNumSubscribers() == 0)         // no one listening?
@@ -75,21 +75,26 @@ namespace velodyne_pointcloud
     // process each packet provided by the driver
 
     int pCount = 0;
-    for (size_t i = 0; i < scanMsg->packets.size(); ++i)
+    uint32_t lastHwTime;
+    for (size_t i = 0; i <= scanMsg->packets.size(); ++i)
       {
         uint32_t hwTime;
-        data_->unpack(scanMsg->packets[i], *outMsg, &hwTime);
-
-        if(outMsg->size() > 0 && lastSize == 0) {
-          hw_start.update(hwTime);
-          std::cout << "hw_start.toSec()=" << hw_start.toSec() << std::endl; // XXX: debug output of hw_start.toSec()
-          ros::Time t;
-          t.fromSec(hw_timer_.update(hw_start, hw_start, scanMsg->packets[i].stamp.toSec()));
-          std::cout << "t.sec=" << t.sec << std::endl; // XXX: debug output of t.sec
-          outMsg->header.stamp = pcl_conversions::toPCL(t);
+        double timeGapTillEndSecs = 0;
+        if (i < scanMsg->packets.size()) {
+          data_->unpack(scanMsg->packets[i], *outMsg, &hwTime, &timeGapTillEndSecs);
         }
 
-        if(outMsg->size() > 0 && outMsg->size() == lastSize){
+        if(outMsg->size() > lastSize) {
+          lastHwTime = hwTime;
+        }
+
+        if(outMsg->size() > 0 && outMsg->size() == lastSize){ // last Packet did not contribute or didn't exist (i == scanMsg->packets.size())
+          hw_start.update(lastHwTime);
+          std::cout << "hw_start.toSec()=" << hw_start.toSec() << std::endl; // XXX: debug output of hw_start.toSec()
+          ros::Time t;
+          t.fromSec(hw_timer_.update(hw_start, hw_start, scanMsg->packets[i - 1].stamp.toSec()) - timeGapTillEndSecs);
+          outMsg->header.stamp = pcl_conversions::toPCL(t);
+
           // publish the accumulated cloud message
           ROS_DEBUG_STREAM("Publishing " << outMsg->height * outMsg->width
                            << " Velodyne points, time: " << outMsg->header.stamp);
