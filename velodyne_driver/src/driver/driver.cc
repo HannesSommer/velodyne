@@ -139,8 +139,6 @@ bool VelodyneDriver::poll(void)
         {
           // keep reading until full packet received
           int rc = input_->getPacket(&scan->packets[i], config_.time_offset);
-          std::cout << "config_.time_offset=" << config_.time_offset << std::endl; // XXX: debug output of config_.time_offset
-          std::cout << "scan->packets[i].stamp=" << scan->packets[i].stamp << std::endl; // XXX: debug output of scan->packets[i].stamp
           if (rc == 0) break;       // got a full packet?
           if (rc < 0) return false; // end of file reached?
         }
