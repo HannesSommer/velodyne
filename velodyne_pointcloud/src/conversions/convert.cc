@@ -58,7 +58,7 @@ namespace velodyne_pointcloud
   {
 
     static hw_timer::WrapFixer hw_start(3600 * 1e6, 1e6); // wraps every hour according to documentation!
-
+    static double lastPacketTime = -1;
 
     if (output_.getNumSubscribers() == 0)         // no one listening?
       return;                                     // avoid much work
@@ -75,25 +75,26 @@ namespace velodyne_pointcloud
     // process each packet provided by the driver
 
     int pCount = 0;
-    uint32_t lastHwTime;
+    double lastHwTimeWithRelevantPoints;
     for (size_t i = 0; i <= scanMsg->packets.size(); ++i)
       {
         uint32_t hwTime;
         double timeGapTillEndSecs = 0;
         if (i < scanMsg->packets.size()) {
           data_->unpack(scanMsg->packets[i], *outMsg, &hwTime, &timeGapTillEndSecs);
+
+          hw_start.update(hwTime);
+          double packetTime = hw_timer_.update(hw_start, hw_start, scanMsg->packets[i].stamp.toSec());
+//          std::cout << "packetTime - lastPacketTime=" << (packetTime - lastPacketTime) << std::endl; // XXX: debug output of packetTime- lastPacketTime
+          lastPacketTime = packetTime;
         }
 
         if(outMsg->size() > lastSize) {
-          lastHwTime = hwTime;
+          lastHwTimeWithRelevantPoints =  lastPacketTime - timeGapTillEndSecs;
         }
 
         if(outMsg->size() > 0 && outMsg->size() == lastSize){ // last Packet did not contribute or didn't exist (i == scanMsg->packets.size())
-          hw_start.update(lastHwTime);
-          std::cout << "hw_start.toSec()=" << hw_start.toSec() << std::endl; // XXX: debug output of hw_start.toSec()
-          ros::Time t;
-          t.fromSec(hw_timer_.update(hw_start, hw_start, scanMsg->packets[i - 1].stamp.toSec()) - timeGapTillEndSecs);
-          outMsg->header.stamp = pcl_conversions::toPCL(t);
+          outMsg->header.stamp = pcl_conversions::toPCL(ros::Time(lastHwTimeWithRelevantPoints));
 
           // publish the accumulated cloud message
           ROS_DEBUG_STREAM("Publishing " << outMsg->height * outMsg->width
