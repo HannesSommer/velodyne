@@ -22,10 +22,14 @@ namespace velodyne_pointcloud
   /** @brief Constructor. */
   Convert::Convert(ros::NodeHandle node, ros::NodeHandle private_nh):
     data_(new velodyne_rawdata::RawData()),
-    hw_timer_("/scan", private_nh, 1000)
+    hw_timer_(
+        cuckoo_time_translator::WrappingClockParameters(
+          3600 * 1e6, 1e6 // wraps every hour and runs at 1MHz according to documentation!
+        ),
+        private_nh.getNamespace()
+      )
   {
     data_->setup(private_nh);
-
 
     // advertise output point cloud (before subscribing to input data)
     output_ =
@@ -56,10 +60,6 @@ namespace velodyne_pointcloud
   /** @brief Callback for raw scan messages. */
   void Convert::processScan(const velodyne_msgs::VelodyneScan::ConstPtr &scanMsg)
   {
-
-    static hw_timer::WrapFixer hw_start(3600 * 1e6, 1e6); // wraps every hour according to documentation!
-    static double lastPacketTime = -1;
-
     if (output_.getNumSubscribers() == 0)         // no one listening?
       return;                                     // avoid much work
 
@@ -75,26 +75,22 @@ namespace velodyne_pointcloud
     // process each packet provided by the driver
 
     int pCount = 0;
-    double lastHwTimeWithRelevantPoints;
+    ros::Time lastHwTimeWithRelevantPoints;
     for (size_t i = 0; i <= scanMsg->packets.size(); ++i)
       {
         uint32_t hwTime;
         double timeGapTillEndSecs = 0;
         if (i < scanMsg->packets.size()) {
           data_->unpack(scanMsg->packets[i], *outMsg, &hwTime, &timeGapTillEndSecs);
-
-          hw_start.update(hwTime);
-          double packetTime = hw_timer_.update(hw_start, hw_start, scanMsg->packets[i].stamp.toSec());
-//          std::cout << "packetTime - lastPacketTime=" << (packetTime - lastPacketTime) << std::endl; // XXX: debug output of packetTime- lastPacketTime
-          lastPacketTime = packetTime;
+          lastPacketTime_ = hw_timer_.update(hwTime, scanMsg->packets[i].stamp);
         }
 
         if(outMsg->size() > lastSize) {
-          lastHwTimeWithRelevantPoints =  lastPacketTime - timeGapTillEndSecs;
+          lastHwTimeWithRelevantPoints =  lastPacketTime_ - ros::Duration(timeGapTillEndSecs);
         }
 
         if(outMsg->size() > 0 && outMsg->size() == lastSize){ // last Packet did not contribute or didn't exist (i == scanMsg->packets.size())
-          outMsg->header.stamp = pcl_conversions::toPCL(ros::Time(lastHwTimeWithRelevantPoints));
+          outMsg->header.stamp = pcl_conversions::toPCL(lastHwTimeWithRelevantPoints);
 
           // publish the accumulated cloud message
           ROS_DEBUG_STREAM("Publishing " << outMsg->height * outMsg->width
@@ -106,7 +102,6 @@ namespace velodyne_pointcloud
 
         lastSize = outMsg->size();
       }
-    std::cout << "pCount=" << pCount << std::endl; // XXX: debug output of pCount
   }
 
 } // namespace velodyne_pointcloud

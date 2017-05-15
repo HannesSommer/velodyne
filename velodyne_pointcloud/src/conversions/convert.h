@@ -25,7 +25,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <velodyne_pointcloud/CloudNodeConfig.h>
 
-#include <hw_timer/HwTimer.hpp>
+#include <cuckoo_time_translator/DeviceTimeTranslator.h>
 
 namespace velodyne_pointcloud
 {
@@ -50,7 +50,7 @@ namespace velodyne_pointcloud
     ros::Subscriber velodyne_scan_;
     ros::Publisher output_;
 
-    hw_timer::HwTimer hw_timer_;
+    cuckoo_time_translator::DefaultDeviceTimeUnwrapperAndTranslator hw_timer_;
 
 
     /// configuration parameters
@@ -58,6 +58,8 @@ namespace velodyne_pointcloud
       int npackets;                    ///< number of packets to combine
     } Config;
     Config config_;
+
+    ros::Time lastPacketTime_;
   };
 
 } // namespace velodyne_pointcloud
